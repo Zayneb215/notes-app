@@ -1,4 +1,4 @@
-import { ID, Query, type Models } from 'react-native-appwrite';
+import { ID, Permission, Query, Role, type Models } from 'react-native-appwrite';
 
 import { config, tablesDB } from '../lib/appwrite';
 import type { Note, NoteDraft } from '../types';
@@ -17,19 +17,24 @@ const toNote = (row: NoteRow): Note => ({
     content: row.content ?? '',
 });
 
-export async function listNotes(): Promise<Note[]> {
+export async function listNotes(userId: string): Promise<Note[]> {
     const result = await tablesDB.listRows<NoteRow>({
         ...target,
-        queries: [Query.orderDesc('$createdAt')],
+        queries: [Query.equal('userId', userId), Query.orderDesc('$createdAt')],
     });
     return result.rows.map(toNote);
 }
 
-export async function createNote(draft: NoteDraft): Promise<Note> {
+export async function createNote(userId: string, draft: NoteDraft): Promise<Note> {
     const row = await tablesDB.createRow<NoteRow>({
         ...target,
         rowId: ID.unique(),
-        data: draft,
+        data: { ...draft, userId },
+        permissions: [
+            Permission.read(Role.user(userId)),
+            Permission.update(Role.user(userId)),
+            Permission.delete(Role.user(userId)),
+        ],
     });
     return toNote(row);
 }

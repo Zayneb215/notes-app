@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { EmptyState } from '../components/EmptyState';
 import { NoteInputModal } from '../components/NoteInputModal';
 import { NoteItem } from '../components/NoteItem';
+import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../lib/errors';
 import { createNote, deleteNote, listNotes, updateNote } from '../services/notes';
 import type { Note, NoteDraft } from '../types';
 
 export default function NotesScreen() {
+  // The route is protected, so a user always exists on this screen
+  const userId = useAuth().user!.$id;
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +22,13 @@ export default function NotesScreen() {
     setLoading(true);
     setError(null);
     try {
-      setNotes(await listNotes());
+      setNotes(await listNotes(userId));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void load();
@@ -32,7 +37,7 @@ export default function NotesScreen() {
   const save = async (draft: NoteDraft) => {
     try {
       if (editing === 'new') {
-        const created = await createNote(draft);
+        const created = await createNote(userId, draft);
         setNotes((current) => [created, ...current]);
       } else if (editing) {
         const updated = await updateNote(editing.id, draft);
@@ -89,7 +94,7 @@ export default function NotesScreen() {
         contentContainerStyle={styles.list}
         refreshing={loading}
         onRefresh={load}
-        ListEmptyComponent={<Text style={styles.empty}>No notes yet.</Text>}
+        ListEmptyComponent={<EmptyState onCreate={() => setEditing('new')} />}
         renderItem={({ item }) => (
           <NoteItem note={item} onEdit={setEditing} onDelete={() => remove(item)} />
         )}
@@ -117,7 +122,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   list: { padding: 16, gap: 12 },
-  empty: { textAlign: 'center', color: '#60646c' },
   error: { color: '#c0392b', textAlign: 'center' },
   retry: { color: '#208AEF', fontSize: 16 },
   fab: {
